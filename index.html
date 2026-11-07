@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventário de TI</title>
+<style>
+  :root { --bg:#0f1218; --card:#171c26; --line:#262d3b; --txt:#e6e9ef; --mut:#8b94a7; --acc:#4f8cff; --ok:#3ecf8e; --warn:#f5b74a; --bad:#ef5d5d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+  h1 { margin:0; font-size:20px; }
+  h1 small { color:var(--mut); font-weight:400; font-size:13px; margin-left:8px; }
+  main { padding:24px; max-width:1100px; margin:0 auto; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card b { display:block; font-size:24px; }
+  .card span { color:var(--mut); font-size:13px; }
+  .bar { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+  input, select, button { background:var(--card); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:14px; }
+  input:focus, select:focus { outline:2px solid var(--acc); }
+  #busca { flex:1; min-width:200px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--acc); border-color:var(--acc); color:#fff; }
+  button:hover { filter:brightness(1.12); }
+  table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:10px 12px; font-size:14px; border-bottom:1px solid var(--line); }
+  th { color:var(--mut); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  tr:last-child td { border-bottom:0; }
+  .tag { padding:3px 9px; border-radius:999px; font-size:12px; font-weight:600; }
+  .st-Em-uso { background:#3ecf8e22; color:var(--ok); }
+  .st-Em-estoque { background:#4f8cff22; color:var(--acc); }
+  .st-Manutencao { background:#f5b74a22; color:var(--warn); }
+  .st-Baixado { background:#ef5d5d22; color:var(--bad); }
+  .acoes button { padding:5px 9px; font-size:12px; margin-right:4px; }
+  .vazio { text-align:center; color:var(--mut); padding:30px; }
+  dialog { background:var(--card); color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:20px; width:min(440px,92vw); }
+  dialog::backdrop { background:#000a; }
+  label { display:block; font-size:13px; color:var(--mut); margin:10px 0 4px; }
+  dialog input, dialog select { width:100%; }
+  .rodape { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .aviso { color:var(--mut); font-size:12px; margin-top:16px; }
+  @media (max-width:700px) { .esconde { display:none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Inventário de TI <small>demo com dados fictícios</small></h1>
+  <div>
+    <button id="btnExportar">Exportar CSV</button>
+    <button id="btnNovo" class="primary">+ Novo equipamento</button>
+  </div>
+</header>
+<main>
+  <section class="cards" id="resumo"></section>
+  <div class="bar">
+    <input id="busca" type="search" placeholder="Buscar por patrimônio, equipamento, responsável ou setor...">
+    <select id="filtroStatus">
+      <option value="">Todos os status</option>
+      <option>Em uso</option><option>Em estoque</option><option>Manutenção</option><option>Baixado</option>
+    </select>
+    <select id="filtroTipo"><option value="">Todos os tipos</option></select>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Patrimônio</th><th>Equipamento</th><th class="esconde">Tipo</th><th class="esconde">Setor</th><th>Responsável</th><th>Status</th><th></th>
+    </tr></thead>
+    <tbody id="lista"></tbody>
+  </table>
+  <p class="aviso">Os dados ficam salvos só no seu navegador (localStorage). Nenhuma informação é enviada para servidor.</p>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h2 id="dlgTitulo" style="margin:0 0 4px">Novo equipamento</h2>
+    <label>Patrimônio</label><input id="fPatrimonio" required placeholder="Ex.: TI-0016">
+    <label>Equipamento</label><input id="fNome" required placeholder="Ex.: Notebook Dell Latitude 3420">
+    <label>Tipo</label>
+    <select id="fTipo">
+      <option>Notebook</option><option>Desktop</option><option>Monitor</option><option>Impressora</option>
+      <option>Access Point</option><option>Switch</option><option>Celular</option><option>Periférico</option>
+    </select>
+    <label>Setor</label><input id="fSetor" placeholder="Ex.: Financeiro">
+    <label>Responsável</label><input id="fResp" placeholder="Nome de quem usa (ou vazio)">
+    <label>Status</label>
+    <select id="fStatus"><option>Em uso</option><option>Em estoque</option><option>Manutenção</option><option>Baixado</option></select>
+    <div class="rodape">
+      <button type="button" id="btnCancelar">Cancelar</button>
+      <button type="submit" class="primary">Salvar</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const CHAVE = 'inventario-ti-demo-v1';
+const DADOS_INICIAIS = [
+  { id:'TI-0001', nome:'Notebook Dell Latitude 3420', tipo:'Notebook', setor:'Financeiro', resp:'Ana Souza', status:'Em uso' },
+  { id:'TI-0002', nome:'Notebook Lenovo ThinkPad E14', tipo:'Notebook', setor:'Comercial', resp:'Carlos Lima', status:'Em uso' },
+  { id:'TI-0003', nome:'Desktop HP ProDesk 400', tipo:'Desktop', setor:'Recepção', resp:'Marina Alves', status:'Em uso' },
+  { id:'TI-0004', nome:'Monitor LG 24" Full HD', tipo:'Monitor', setor:'Financeiro', resp:'Ana Souza', status:'Em uso' },
+  { id:'TI-0005', nome:'Impressora HP LaserJet Pro M404', tipo:'Impressora', setor:'Administrativo', resp:'', status:'Manutenção' },
+  { id:'TI-0006', nome:'Access Point Ubiquiti UniFi U6', tipo:'Access Point', setor:'Térreo', resp:'', status:'Em uso' },
+  { id:'TI-0007', nome:'Switch TP-Link 24 portas', tipo:'Switch', setor:'Sala de TI', resp:'', status:'Em uso' },
+  { id:'TI-0008', nome:'Notebook Acer Aspire 5', tipo:'Notebook', setor:'Sala de TI', resp:'', status:'Em estoque' },
+  { id:'TI-0009', nome:'Desktop Dell OptiPlex 3080', tipo:'Desktop', setor:'RH', resp:'Paulo Mendes', status:'Em uso' },
+  { id:'TI-0010', nome:'Monitor Samsung 22"', tipo:'Monitor', setor:'Sala de TI', resp:'', status:'Em estoque' },
+  { id:'TI-0011', nome:'Celular Samsung Galaxy A34', tipo:'Celular', setor:'Comercial', resp:'Carlos Lima', status:'Em uso' },
+  { id:'TI-0012', nome:'Teclado e mouse sem fio Logitech', tipo:'Periférico', setor:'Sala de TI', resp:'', status:'Em estoque' },
+  { id:'TI-0013', nome:'Desktop antigo Positivo', tipo:'Desktop', setor:'Almoxarifado', resp:'', status:'Baixado' },
+  { id:'TI-0014', nome:'Access Point TP-Link EAP225', tipo:'Access Point', setor:'1º andar', resp:'', status:'Em uso' },
+  { id:'TI-0015', nome:'Notebook HP 250 G8', tipo:'Notebook', setor:'Administrativo', resp:'Juliana Reis', status:'Manutenção' }
+];
+
+let itens = carregar();
+let editandoId = null;
+
+function carregar() {
+  try {
+    const salvo = JSON.parse(localStorage.getItem(CHAVE));
+    if (Array.isArray(salvo)) return salvo;
+  } catch (e) {}
+  return DADOS_INICIAIS.map(i => ({ ...i }));
+}
+function salvar() {
+  try { localStorage.setItem(CHAVE, JSON.stringify(itens)); } catch (e) {}
+}
+function esc(t) {
+  return String(t ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+const $ = id => document.getElementById(id);
+
+function preencherTipos() {
+  const tipos = [...new Set(itens.map(i => i.tipo))].sort();
+  const atual = $('filtroTipo').value;
+  $('filtroTipo').innerHTML = '<option value="">Todos os tipos</option>' +
+    tipos.map(t => `<option ${t === atual ? 'selected' : ''}>${esc(t)}</option>`).join('');
+}
+
+function resumo() {
+  const conta = s => itens.filter(i => i.status === s).length;
+  $('resumo').innerHTML = [
+    ['Total', itens.length], ['Em uso', conta('Em uso')], ['Em estoque', conta('Em estoque')],
+    ['Manutenção', conta('Manutenção')], ['Baixados', conta('Baixado')]
+  ].map(([r, n]) => `<div class="card"><b>${n}</b><span>${r}</span></div>`).join('');
+}
+
+function filtrados() {
+  const q = $('busca').value.trim().toLowerCase();
+  const st = $('filtroStatus').value, tp = $('filtroTipo').value;
+  return itens.filter(i =>
+    (!st || i.status === st) && (!tp || i.tipo === tp) &&
+    (!q || [i.id, i.nome, i.resp, i.setor, i.tipo].join(' ').toLowerCase().includes(q))
+  );
+}
+
+function desenhar() {
+  resumo();
+  const lista = filtrados();
+  $('lista').innerHTML = lista.length ? lista.map(i => `
+    <tr>
+      <td>${esc(i.id)}</td>
+      <td>${esc(i.nome)}</td>
+      <td class="esconde">${esc(i.tipo)}</td>
+      <td class="esconde">${esc(i.setor)}</td>
+      <td>${esc(i.resp) || '—'}</td>
+      <td><span class="tag st-${esc(i.status.replace(/\s/g,'-').replace('ç','c').replace('ã','a'))}">${esc(i.status)}</span></td>
+      <td class="acoes">
+        <button data-acao="editar" data-id="${esc(i.id)}">Editar</button>
+        <button data-acao="excluir" data-id="${esc(i.id)}">Excluir</button>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="7" class="vazio">Nenhum equipamento encontrado.</td></tr>';
+}
+
+function abrirForm(item) {
+  editandoId = item ? item.id : null;
+  $('dlgTitulo').textContent = item ? 'Editar equipamento' : 'Novo equipamento';
+  $('fPatrimonio').value = item?.id ?? proximoId();
+  $('fNome').value = item?.nome ?? '';
+  $('fTipo').value = item?.tipo ?? 'Notebook';
+  $('fSetor').value = item?.setor ?? '';
+  $('fResp').value = item?.resp ?? '';
+  $('fStatus').value = item?.status ?? 'Em estoque';
+  $('dlg').showModal();
+}
+function proximoId() {
+  const n = itens.map(i => parseInt(i.id.replace(/\D/g, ''), 10) || 0);
+  return 'TI-' + String(Math.max(0, ...n) + 1).padStart(4, '0');
+}
+
+$('btnNovo').onclick = () => abrirForm(null);
+$('btnCancelar').onclick = () => $('dlg').close();
+$('form').addEventListener('submit', e => {
+  const id = $('fPatrimonio').value.trim();
+  if (!id || !$('fNome').value.trim()) return;
+  if (itens.some(i => i.id === id && i.id !== editandoId)) {
+    e.preventDefault();
+    alert('Já existe um equipamento com esse patrimônio.');
+    return;
+  }
+  const novo = {
+    id, nome: $('fNome').value.trim(), tipo: $('fTipo').value, setor: $('fSetor').value.trim(),
+    resp: $('fResp').value.trim(), status: $('fStatus').value
+  };
+  if (editandoId) itens = itens.map(i => i.id === editandoId ? novo : i);
+  else itens.push(novo);
+  salvar(); preencherTipos(); desenhar();
+});
+
+$('lista').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const item = itens.find(i => i.id === b.dataset.id); if (!item) return;
+  if (b.dataset.acao === 'editar') abrirForm(item);
+  if (b.dataset.acao === 'excluir' && confirm(`Excluir ${item.id} - ${item.nome}?`)) {
+    itens = itens.filter(i => i.id !== item.id);
+    salvar(); preencherTipos(); desenhar();
+  }
+});
+
+['busca', 'filtroStatus', 'filtroTipo'].forEach(id => $(id).addEventListener('input', desenhar));
+
+$('btnExportar').onclick = () => {
+  const cab = ['Patrimônio', 'Equipamento', 'Tipo', 'Setor', 'Responsável', 'Status'];
+  const linhas = filtrados().map(i => [i.id, i.nome, i.tipo, i.setor, i.resp, i.status]
+    .map(v => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(';'));
+  const csv = '﻿' + [cab.join(';'), ...linhas].join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = 'inventario-ti.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+preencherTipos();
+desenhar();
+</script>
+</body>
+</html>
