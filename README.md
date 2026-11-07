@@ -29,6 +29,7 @@ HTML5, CSS3 e JavaScript (ES6+).
 - Campo de garantia e data de compra
 - Importação de CSV
 - Versão com banco de dados
+- Login com perfil de editor e perfil de visitante (somente leitura)
 
 ## Autor
 
